@@ -29,7 +29,7 @@ class App extends Component {
 
 
   generateMelody() {
-    var synth = new Tone.Synth().toMaster();
+    const synth = new Tone.Synth().toMaster();
     const triggerSynth = (note, duration, time) => this.triggerInstrument(synth, note, duration, time);
 
     Tone.Transport.schedule(time => triggerSynth('C2', '8n', time), 0)
@@ -40,28 +40,34 @@ class App extends Component {
   }
 
   //gives us all possible notes within the given range in the proper key, relative to the given root key
-  generateNoteRange(lowNote, highNote, rootKey) {
-    const rootMidiNote = (Tone.Frequency(rootKey).toMidi()); 
-    const anchorMidiNote = rootMidiNote - 1;//actually get the one right before the root, since our first increment is 1
-    const lowMidiNote = Tone.Frequency(lowNote).toMidi();
-    const highMidiNote = Tone.Frequency(highNote).toMidi();
+  generateNoteRange(lowSciNote, highSciNote, Key) {
+    const rootNote = (Tone.Frequency(Key).toMidi()); 
+    const lowNote = Tone.Frequency(lowSciNote).toMidi();
+    const highNote = Tone.Frequency(highSciNote).toMidi();
 
-    var scaleIncrements = [1, 2, 2, 1, 2, 2, 2]
-    const NumberOfNotes = highMidiNote - lowMidiNote
-    const NumScales = Math.ceil(NumberOfNotes / 7.0) //TODO: Is a scale 8 or 7 notes lmao
+    const scaleIncrements = [2, 2, 1, 2, 2, 2, 1]
+    const numberOfNotes = highNote - lowNote
+    const numScales = Math.ceil(numberOfNotes / scaleIncrements.length)
 
-    const reducer = (accumulator, current_value) => accumulator.concat(scaleIncrements)
-    var range = [...Array(NumScales).keys()] //get an array of the length of numScales, initialized values don't matter
-    var expandedScaleIncrements = range.reduce(reducer, []) //basically we repeat scaleIncrements for the number of scales we require
 
-    const lowAnchor = anchorMidiNote - NumScales * 7 //TODO: Is a scale 8 or 7 notes lmao
+    //generator iterator that, given a starting root note, expands out the scale for the given number of scales
+    function* getNotes(startRoot, scaleIncrements, numScales) {
+      let currentNote = startRoot;
+      let index = 0;
+      while(index < numScales * scaleIncrements.length) {
+        let increment = scaleIncrements[index++ % scaleIncrements.length];
+        yield currentNote+=increment;
+      }
+    }
 
-    //multiply the scale increments list out so it goes from low root to high root
-    const reducer = (accumulator, current_value) => accumulator.push(current_value + [accumulator[accumulator.length-1]])
-    var notes = expandedScaleIncrements.reduce(reducer, [lowAnchor])
+    const lowRoot = rootNote - (numScales * scaleIncrements.length)
+
+    const notes = [...getNotes(lowRoot, scaleIncrements, numScales)];
 
     //now filter the notes so we're within the given range
-    var trimmedNotes = notes.filter(note => note >= lowMidiNote and note <= highMidiNote)
+    const trimmedNotes = notes.filter(note => note >= lowMidiNote and note <= highMidiNote)
+
+    return trimmedNotes;
   }
 
   generateRandomNote(note_range) {
